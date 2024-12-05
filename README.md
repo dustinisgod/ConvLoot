@@ -29,27 +29,27 @@ These commands provide general controls for the bot's configuration and operatio
 These commands allow you to set specific actions for items, such as keeping, selling, banking, ignoring, or destroying.
 
 ### Mark Item as "Keep"
-- **Command:** `/loot keep <item>` or `/loot keep`
+- **Command:** `/loot keep <Item Name>` or `/loot keep` with item on cursor.
 - **Description:** Marks the specified item as "Keep" or assigns this status to the item currently on the cursor.
 - **Example:** `/loot keep Precious Gem`
 
 ### Mark Item as "Ignore"
-- **Command:** `/loot ignore <item>` or `/loot ignore`
+- **Command:** `/loot ignore <Item Name>` or `/loot ignore` with item on cursor.
 - **Description:** Marks the specified item as "Ignore," preventing it from being looted.
 - **Example:** `/loot ignore Rusty Sword`
 
 ### Mark Item as "Sell"
-- **Command:** `/loot sell <item>` or `/loot sell`
+- **Command:** `/loot sell <Item Name>` or `/loot sell` with item on cursor.
 - **Description:** Marks the specified item as "Sell" to automatically sell it at a merchant.
 - **Example:** `/loot sell Torn Parchment`
 
 ### Mark Item as "Bank"
-- **Command:** `/loot bank <item>` or `/loot bank`
+- **Command:** `/loot bank <Item Name>` or `/loot bank` with item on cursor.
 - **Description:** Marks the specified item as "Bank" for transfer to your bank.
 - **Example:** `/loot bank Rare Artifact`
 
 ### Mark Item as "Destroy"
-- **Command:** `/loot destroy <item>` or `/loot destroy`
+- **Command:** `/loot destroy <Item Name>` or `/loot destroy` with item on cursor.
 - **Description:** Marks the specified item as "Destroy" for immediate disposal.
 - **Example:** `/loot destroy Broken Shard`
 
