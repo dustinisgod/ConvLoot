@@ -31,8 +31,12 @@ local isReloading = false
 local iniPath = mq.configDir .. '/loot.ini'
 
 
--- Change this to whatever path you want for example across a LAN: local customIniPath = '//pcname/c/Macroquest/config/Loot.ini'
+-- Supports local loot.ini file by default, or you can add a custom path using customIniPath.
+-- Inside of the init.lua file find line customIniPath = nil and change it to your path local customIniPath = '//pcname/c/Macroquest/config/Loot.ini'.
+-- This will allow you to use the same loot.ini file across a local area network. All chars will read and update this file.
+
 local customIniPath = nil
+
 
 
 -- Function to load loot configuration
