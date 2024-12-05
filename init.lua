@@ -29,7 +29,12 @@ local inventoryFullReported = false
 local isReloading = false
 -- Default path settings
 local iniPath = mq.configDir .. '/loot.ini'
+
+
+-- Change this to whatever path you want for example across a LAN: local customIniPath = '//pcname/c/Macroquest/config/Loot.ini'
 local customIniPath = nil
+
+
 -- Function to load loot configuration
 local function loadLootConfig()
     if isReloading then return end -- Prevent recursive spam during reload
