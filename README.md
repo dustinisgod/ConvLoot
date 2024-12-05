@@ -69,3 +69,9 @@ These commands facilitate interactions with merchants and bankers.
 ### Bank Items
 - **Command:** `/loot cleanup`
 - **Description:** Automatically destroys all items marked as "Destroy" in the inventory.
+
+---
+
+Supports local loot.ini file by default, or you can add a custom path using `customIniPath`.
+Inside of the init.lua file find line `customIniPath = nil` and change it to your path `local customIniPath = '//pcname/c/Macroquest/config/Loot.ini'`.
+This will allow you to use the same loot.ini file across a local area network. All chars will read and update this file.
