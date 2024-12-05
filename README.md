@@ -1,7 +1,7 @@
 # Loot Manager Command Guide
 
 ### Start Script
-- **Command:** `/lua run LootManager`
+- **Command:** `/lua run ConvLoot`
 - **Description:** Starts the Lua script for the Loot Manager bot.
 
 ---
