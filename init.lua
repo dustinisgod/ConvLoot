@@ -29,7 +29,7 @@ local inventoryFullReported = false
 local isReloading = false
 -- Default path settings
 local iniPath = mq.configDir .. '/loot.ini'
-local customIniPath = '//Dustin-pc/c/MQ-Emu/config/Loot.ini'
+local customIniPath = nil
 -- Function to load loot configuration
 local function loadLootConfig()
     if isReloading then return end -- Prevent recursive spam during reload
