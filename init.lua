@@ -831,6 +831,9 @@ local function commandHandler(command, ...)
     elseif command == "nodrop" then
         settings.LootNoDrop = not settings.LootNoDrop
         print("Looting No-Drop items is now " .. (settings.LootNoDrop and "enabled" or "disabled") .. ".")
+    elseif command == "corpseradius" then
+        settings.CorpseRadius = tonumber(args[1]) or 0
+        print("Corpse radius set to: " .. settings.CorpseRadius)
     elseif command == "keep" then
         setItemKeep(args[1])
     elseif command == "ignore" then
