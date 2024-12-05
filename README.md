@@ -1,4 +1,4 @@
-# Loot Manager Bot Command Guide
+# Loot Manager Command Guide
 
 ### Start Script
 - **Command:** `/lua run LootManager`
