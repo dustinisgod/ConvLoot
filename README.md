@@ -1,3 +1,5 @@
+version=1.0.0
+
 # Loot Manager Command Guide
 
 ### Start Script
