@@ -47,7 +47,7 @@ local function loadLootConfig()
 
     local configFile, err = io.open(path, "r")
     if not configFile then
-        print(string.format("Failed to load loot configuration file from '%s': %s", path, err))
+        printf("Failed to load loot configuration file from '%s': %s", path, err)
         return
     end
 
@@ -62,7 +62,7 @@ local function loadLootConfig()
         if line:sub(1, 1) == "[" and line:sub(-1) == "]" then
             currentSection = line:sub(2, -2)
             tempConfig[currentSection] = {}
-            print("New section found: [" .. currentSection .. "]")
+            mq.cmdf("/echo New section found: \ay[" .. currentSection .. "]\ax")
         elseif line:find("=") and currentSection then
             local item, action = line:match("^(.-)=(.-)$")
             if item and action then
@@ -77,7 +77,7 @@ local function loadLootConfig()
     -- Validate loaded config before overwriting
     if next(tempConfig) then
         lootConfig = tempConfig
-        print("Loot configuration loaded successfully.")
+        mq.cmdf("/echo Loot configuration loaded \agsuccessfully\ax.")
     else
         print("Warning: Loaded configuration is empty. Keeping existing settings.")
     end
@@ -101,7 +101,6 @@ local function backupFile(filePath)
     end
     source:close()
     dest:close()
-    print("Backup created at: " .. backupPath)
 end
 
 local function saveLootConfig()
@@ -110,7 +109,7 @@ local function saveLootConfig()
 
     local file, err = io.open(path, "w")
     if not file then
-        print(string.format("Failed to save loot configuration file to '%s': %s", path, err))
+        printf("Failed to save loot configuration file to '%s': %s", path, err)
         return
     end
 
@@ -141,7 +140,6 @@ local function saveLootConfig()
     end
     
     file:close()
-    print("Loot configuration saved to " .. path)
 end
 
 local function updateLootConfig(action, itemName)
@@ -167,13 +165,13 @@ local function hasSufficientInventorySpace()
     local emptySlots = mq.TLO.Me.FreeInventory() or 0
     if emptySlots <= settings.MinimumEmptySlots - 1 then
         if not inventoryFullReported then
-            mq.cmdf("/dgt !!!! Inventory is almost full (%d empty slots remaining). Looting paused. !!!!", emptySlots)
+            mq.cmdf("/dgt \\ar!!!!\\ax \\ayInventory is almost full (\\ax\\ag%d\\ax\\ay empty slots remaining). Looting paused.\\ax\\ar !!!!\\ax", emptySlots)
             inventoryFullReported = true -- Set the flag to avoid duplicate messages
         end
         return false
     else
         if inventoryFullReported then
-            print("Inventory space available. Resuming looting.")
+            mq.cmd("/echo \agInventory space available. Resuming looting.\ax")
             inventoryFullReported = false -- Reset the flag when space is available
         end
         return true
@@ -207,7 +205,7 @@ local function getLootAction(itemName)
             return items[itemName]
         end
     end
-    print(string.format("Item '%s' not found in loot configuration.", itemName))
+    mq.cmdf("/echo \arItem \ao'%s'\ax not found in loot configuration.", itemName)
     return nil
 end
 
@@ -237,13 +235,13 @@ local function lootCorpse(corpseID)
     end
 
     if not success then
-        print("Failed to open loot window for corpse ID: " .. corpseID)
+        mq.cmdf("/echo \arFailed to open loot window for corpse ID: \ao%s\ax", corpseID)
         markLockedCorpse(corpseID) -- Mark the corpse as locked after 3 failed attempts
         return
     end
 
     local items = mq.TLO.Corpse.Items() or 0
-    print("Loot window opened. Items available: " .. items)
+    mq.cmdf("/echo \agLoot window opened. Items available: \ay%s\ax", items)
     debugPrint("Items: " .. items)
     local corpseHasLoreItem = false -- Flag to mark the corpse as not lootable
 
@@ -263,7 +261,7 @@ local function lootCorpse(corpseID)
             end
 
             if isLore then
-                print("Item '" .. itemName .. "' is Lore. Checking inventory.")
+                mq.cmdf("/echo \agItem \ao'%s'\ax is \ayLore\ax. Checking inventory.", itemName)
                 local alreadyHaveItem = mq.TLO.FindItem(itemName)() or mq.TLO.FindItemBank(itemName)()
                 if alreadyHaveItem then
                     mq.cmdf('/dgt \\ar!!!!\\ax \\aySkipping Lore item:\\ax \\ag%s\\ax \\ayon Corpse ID:\\ax \\ag%d\\ax \\ar!!!!', itemName, corpseID)
@@ -273,11 +271,11 @@ local function lootCorpse(corpseID)
             end
 
             if action == "Keep" or action == "Bank" or action == "Sell" then
-                print(string.format("Looting item: %s (Action: %s)", itemName, action))
+                mq.cmdf("/echo \agLooting item: \ao%s\ax (\ayAction: %s\ax)", itemName, action)
                 mq.cmdf('/itemnotify loot%d rightmouseup', i) -- Loot the item
                 mq.delay(200) -- Configurable delay to ensure proper processing
             else
-                print(string.format("Skipping item: %s (Unknown Action: %s)", itemName, tostring(action)))
+                mq.cmdf("/echo \arSkipping item: \ao%s\ax (\arUnknown Action: \ay%s\ax)", itemName, tostring(action))
             end
 
             ::continue::
@@ -315,17 +313,17 @@ local function lootNearbyCorpses(limit)
 
             if not isIgnoredCorpse(corpseID) and not cantLootList[corpseID] and not isLockedCorpse(corpseID) then
                 if corpse() and distance and distance <= 15 then
-                    print(string.format("Looting nearby corpse ID %d at distance %.2f.", corpseID, distance))
+                    printf("Looting nearby corpse ID %d at distance %.2f.", corpseID, distance)
                     lootCorpse(corpseID)
                 else
-                    print(string.format("Navigating to corpse ID %d at distance %.2f.", corpseID, distance))
+                    printf("Navigating to corpse ID %d at distance %.2f.", corpseID, distance)
                     mq.cmdf('/nav spawn id %d', corpseID)
                     mq.delay(2000, function() return corpse() and corpse.Distance3D() and corpse.Distance3D() <= 15 end) -- Wait until within 15 units
                     if corpse() and corpse.Distance3D() and corpse.Distance3D() <= 15 then
-                        print(string.format("Now within 15 units. Looting corpse ID %d.", corpseID))
+                        printf("Now within 15 units. Looting corpse ID %d.", corpseID)
                         lootCorpse(corpseID)
                     else
-                        print(string.format("Failed to reach corpse ID %d within 15 units.", corpseID))
+                        printf("Failed to reach corpse ID %d within 15 units.", corpseID)
                     end
                 end
                 didLoot = true
@@ -367,12 +365,12 @@ end
 local function setItemKeep(value)
     value = value or getCursorItemName()
     if not value or value == "" then
-        print("Please specify an item to mark as 'Keep', or place the item on your cursor.")
+        mq.cmd('/echo \arPlease specify an item to mark as \ayKeep\ax, or place the item on your cursor.')
         return
     end
-    print(string.format("Setting '%s' to 'Keep'...", value))
+    mq.cmdf('/echo \agSetting item \ao%s\ax to \ayKeep\ax...', value)
     updateLootConfig("Keep", value)
-    print(string.format("Item '%s' is now set to 'Keep'.", value))
+    mq.cmdf('/echo \agItem \ao%s\ax is now set to \ayKeep\ax.', value)
     mq.cmd('/autoinventory')
     mq.cmd('/dgexecute looter /reloadlootfile')
 end
@@ -381,11 +379,12 @@ end
 local function setItemIgnore(value)
     value = value or getCursorItemName()
     if not value or value == "" then
-        print("Please specify an item to mark as 'Ignore', or place the item on your cursor.")
+        mq.cmd('/echo \arPlease specify an item to mark as \ayIgnore\ax, or place the item on your cursor.')
         return
     end
-    print(string.format("Setting \\ag'%s'\\ax to '\\arIgnore\\ax'.", value))
+    mq.cmdf('/echo \agSetting item \ao%s\ax to \ayIgnore\ax...', value)
     updateLootConfig("Ignore", value)
+    mq.cmdf('/echo \agItem \ao%s\ax is now set to \ayIgnore\ax.', value)
     mq.cmd('/autoinventory')
     mq.cmd('/dgexecute looter /reloadlootfile')
 end
@@ -394,11 +393,12 @@ end
 local function setItemSell(value)
     value = value or getCursorItemName()
     if not value or value == "" then
-        print("Please specify an item to mark as 'Sell', or place the item on your cursor.")
+        mq.cmd('/echo \arPlease specify an item to mark as \aySell\ax, or place the item on your cursor.')
         return
     end
-    print(string.format("Setting \\ag'%s'\\ax to '\\arSell\\ax'.", value))
+    mq.cmdf('/echo \agSetting item \ao%s\ax to \aySell\ax...', value)
     updateLootConfig("Sell", value)
+    mq.cmdf('/echo \agItem \ao%s\ax is now set to \aySell\ax.', value)
     mq.cmd('/autoinventory')
     mq.cmd('/dgexecute looter /reloadlootfile')
 end
@@ -407,11 +407,12 @@ end
 local function setItemBank(value)
     value = value or getCursorItemName()
     if not value or value == "" then
-        print("Please specify an item to mark as 'Bank', or place the item on your cursor.")
+        mq.cmd('/echo \arPlease specify an item to mark as \ayBank\ax, or place the item on your cursor.')
         return
     end
-    print(string.format("Setting \\ag'%s'\\ax to '\\arBank\\ax'.", value))
+    mq.cmdf('/echo \agSetting item \ao%s\ax to \ayBank\ax...', value)
     updateLootConfig("Bank", value)
+    mq.cmdf('/echo \agItem \ao%s\ax is now set to \ayBank\ax.', value)
     mq.cmd('/autoinventory')
     mq.cmd('/dgexecute looter /reloadlootfile')
 end
@@ -420,11 +421,12 @@ end
 local function setItemDestroy(value)
     value = value or getCursorItemName()
     if not value or value == "" then
-        print("Please specify an item to mark as 'Destroy', or place the item on your cursor.")
+        mq.cmd('/echo \arPlease specify an item to mark as \ayDestroy\ax, or place the item on your cursor.')
         return
     end
-    print(string.format("Setting \\ag'%s'\\ax to '\\arDestroy\\ax'.", value))
+    mq.cmdf('/echo \agSetting item \ao%s\ax to \arDestroy\ax...', value)
     updateLootConfig("Destroy", value)
+    mq.cmdf('/echo \agItem \ao%s\ax is now set to \arDestroy\ax.', value)
     mq.cmd('/destroy')
     mq.cmd('/dgexecute looter /reloadlootfile')
 end
@@ -437,7 +439,7 @@ local function findnearbymerchant()
     if merchant() then
         local merchantID = merchant.ID()
         local distance = merchant.Distance3D()
-        print(string.format("Found nearby merchant ID %d at distance %.2f.", merchantID, distance))
+        printf("Found nearby merchant ID %d at distance %.2f.", merchantID, distance)
 
         -- Target the merchant
         mq.cmdf('/target id %d', merchantID)
@@ -450,7 +452,7 @@ local function findnearbymerchant()
 
         -- Navigate to the merchant if it's farther than 15 units
         if distance and merchantID and distance > 15 then
-            print(string.format("Navigating to merchant ID %d (distance: %.2f)...", merchantID, distance))
+            printf("Navigating to merchant ID %d (distance: %.2f)...", merchantID, distance)
             mq.cmdf('/nav spawn id %d', merchantID)
             while mq.TLO.Navigation.Active() do
                 mq.delay(50)
@@ -506,7 +508,7 @@ local function sellstuff()
                         if action == "Sell" then
                             local sellPrice = bagItem.Value() and bagItem.Value() / 1000 or 0
                             if sellPrice > 0 then
-                                print(string.format("Selling '%s' for %.2f plat.", itemName, sellPrice))
+                                mq.cmdf("/echo \agSelling \ao'%s'\ax for \ay%.2f\ax plat.", itemName, sellPrice)
                                 mq.cmdf('/itemnotify in pack%d %d leftmouseup', i - 22, j)
                                 mq.delay(1000, function()
                                     return mq.TLO.Window('MerchantWnd/MW_SelectedItemLabel').Text() == itemName
@@ -518,10 +520,10 @@ local function sellstuff()
                                     end)
                                     totalPlat = totalPlat + sellPrice
                                 else
-                                    print(string.format("Failed to select item '%s' for selling.", itemName))
+                                    mq.cmdf("/echo \arFailed to select item \ao'%s'\ax for selling.", itemName)
                                 end
                             else
-                                print(string.format("Item '%s' has no sell value. Skipping.", itemName))
+                                mq.cmdf("/echo \arItem \ao'%s'\ax has no sell value. \aySkipping.\ax", itemName)
                             end
                         end
                     end
@@ -533,7 +535,7 @@ local function sellstuff()
                 if action == "Sell" then
                     local sellPrice = mainSlotItem.Value() and mainSlotItem.Value() / 1000 or 0
                     if sellPrice > 0 then
-                        print(string.format("Selling '%s' for %.2f plat.", itemName, sellPrice))
+                        mq.cmdf("/echo \agSelling \ao'%s'\ax for \ay%.2f\ax plat.", itemName, sellPrice)
                         mq.cmdf('/itemnotify %d leftmouseup', i)
                         mq.delay(1000, function()
                             return mq.TLO.Window('MerchantWnd/MW_SelectedItemLabel').Text() == itemName
@@ -545,10 +547,10 @@ local function sellstuff()
                             end)
                             totalPlat = totalPlat + sellPrice
                         else
-                            print(string.format("Failed to select item '%s' for selling.", itemName))
+                            mq.cmdf("/echo \arFailed to select item \ao'%s'\ax for selling.", itemName)
                         end
                     else
-                        print(string.format("Item '%s' has no sell value. Skipping.", itemName))
+                        mq.cmdf("/echo \arItem \ao'%s'\ax has no sell value. \aySkipping.\ax", itemName)
                     end
                 end
             end
@@ -568,7 +570,7 @@ local function findnearbybanker()
     if banker() then
         local bankerID = banker.ID()
         local distance = banker.Distance3D()
-        print(string.format("Found nearby banker ID %d at distance %.2f.", bankerID, distance))
+        printf("Found nearby banker ID %d at distance %.2f.", bankerID, distance)
 
         -- Target the banker
         mq.cmdf('/target id %d', bankerID)
@@ -581,7 +583,7 @@ local function findnearbybanker()
 
         -- Navigate to the banker if it's farther than 15 units
         if distance and bankerID and distance > 15 then
-            print(string.format("Navigating to banker ID %d (distance: %.2f)...", bankerID, distance))
+            printf("Navigating to banker ID %d (distance: %.2f)...", bankerID, distance)
             mq.cmdf('/nav spawn id %d', bankerID)
             while mq.TLO.Navigation.Active() do
                 mq.delay(50)
@@ -652,7 +654,7 @@ local function bankstuff()
                                 -- Check if the item can fit in the bank
                                 local itemSize = item.Size()
                                 if canItemFitInBank(itemSize) then
-                                    print(string.format("Banking item: %s from bag %d, slot %d", itemName, i, slot))
+                                    printf("Banking item: %s from bag %d, slot %d", itemName, i, slot)
                                     mq.cmdf(
                                         "/shift /itemnotify in pack%d %d leftmouseup",
                                         math.floor(itemSlot - 22), -- Adjust for pack number
@@ -679,7 +681,7 @@ local function bankstuff()
                             -- Check if the item can fit in the bank
                             local itemSize = slotItem.Size()
                             if canItemFitInBank(itemSize) then
-                                print(string.format("Banking item: %s from main slot %d", itemName, i))
+                                printf("Banking item: %s from main slot %d", itemName, i)
                                 mq.cmdf("/shift /itemnotify %d leftmouseup", itemSlot)
                                 mq.delay(100, function() return mq.TLO.Cursor() end)
                                 mq.cmdf('/notify BigBankWnd BIGB_AutoButton leftmouseup')
@@ -705,33 +707,23 @@ local function bankstuff()
         return false -- No suitable slot found
     end
 
-    -- Helper function to retrieve a single banked item
-    local function retrieveBankItem(itemName, bankSlot, bankSubSlot)
-        if not bankSubSlot or bankSubSlot == -1 then
-            mq.cmdf('/itemnotify bank%d leftmouseup', bankSlot)
-        else
-            mq.cmdf('/itemnotify in bank%d %d leftmouseup', bankSlot, bankSubSlot)
-        end
-        mq.delay(100, function() return mq.TLO.Cursor() end)
-        mq.cmd('/autoinventory')
-        mq.delay(100, function() return not mq.TLO.Cursor() end)
-    end
-
     -- Move items from the bank to inventory
     for bankSlot = 1, 24 do -- Bank slots range from 1 to 24
         local containerSize = mq.TLO.Me.Bank(bankSlot).Container()
         if containerSize and containerSize > 0 then
             -- Bank slot contains a container
-            for slot = 1, containerSize do
-                local item = mq.TLO.Me.Bank(bankSlot).Item(slot)
+            for bankSubslot = 1, containerSize do
+                local item = mq.TLO.Me.Bank(bankSlot).Item(bankSubslot)
                 if item.ID() then
                     local itemName = item.Name()
                     local action = getLootAction(itemName) -- Get the action for the item
                     if action == "Keep" or action == "Sell" or action == "Destroy" then
                         local itemSize = item.Size()
                         if canItemFitInInventory(itemSize) then
-                            print(string.format("Retrieving item: %s from bank slot %d, sub-slot %d", itemName, bankSlot, slot))
-                            retrieveBankItem(itemName, bankSlot, slot)
+                            mq.cmdf('/itemnotify in bank%d %d leftmouseup', bankSlot, bankSubslot)
+                            mq.delay(100, function() return mq.TLO.Cursor() end)
+                            mq.cmd('/autoinventory')
+                            mq.delay(100, function() return not mq.TLO.Cursor() end)
                         else
                             mq.cmd("/dgt \\arNot enough space in inventory for item: " .. itemName)
                             break
@@ -748,8 +740,10 @@ local function bankstuff()
                 if action == "Keep" or action == "Sell" or action == "Destroy" then
                     local itemSize = item.Size()
                     if canItemFitInInventory(itemSize) then
-                        print(string.format("Retrieving item: %s from bank slot %d", itemName, bankSlot))
-                        retrieveBankItem(itemName, bankSlot, -1)
+                        mq.cmdf('/itemnotify bank%d leftmouseup', bankSlot)
+                        mq.delay(100, function() return mq.TLO.Cursor() end)
+                        mq.cmd('/autoinventory')
+                        mq.delay(100, function() return not mq.TLO.Cursor() end)
                     else
                         mq.cmd("/dgt \\arNot enough space in inventory for item: " .. itemName)
                         break
@@ -793,7 +787,7 @@ for i = 23, 32 do -- Bag slots for character inventory
                         local itemSlot = item.ItemSlot()
                         local itemSlot2 = item.ItemSlot2()
                         if itemSlot and itemSlot2 then
-                            print(string.format("Destroying item: %s from bag %d, slot %d", itemName, i, slot))
+                            printf("Destroying item: %s from bag %d, slot %d", itemName, i, slot)
                             mq.cmdf(
                                 "/shift /itemnotify in pack%d %d leftmouseup",
                                 math.floor(itemSlot - 22), -- Adjust for pack number
@@ -814,7 +808,7 @@ for i = 23, 32 do -- Bag slots for character inventory
                 if action == "Destroy" then
                     local itemSlot = slotItem.ItemSlot()
                     if itemSlot then
-                        print(string.format("Destroying item: %s from main slot %d", itemName, i))
+                        printf("Destroying item: %s from main slot %d", itemName, i)
                         mq.cmdf("/shift /itemnotify %d leftmouseup", itemSlot)
                         mq.delay(100, function() return mq.TLO.Cursor() end)
                         mq.cmdf('/destroy')
