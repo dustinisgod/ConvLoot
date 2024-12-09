@@ -622,34 +622,15 @@ local function bankstuff()
         end
     end
 
-    -- Helper function for banking a single item
-    local function bankItem(itemName, bag, slot)
-        if not slot or slot == -1 then
-            mq.cmdf('/shift /itemnotify %s leftmouseup', bag)
-        else
-            mq.cmdf('/shift /itemnotify in pack%s %s leftmouseup', bag, slot)
+    -- Function to check if the bank has space for an item of a specific size
+    local function canItemFitInBank(itemSize)
+        -- Loop from the item's size to the maximum size (4)
+        for size = itemSize, 4 do -- Start at the item's size and go up to the largest size
+            if mq.TLO.Inventory.Bank.FreeSlots(size)() > 0 then
+                return true -- Found a suitable slot
+            end
         end
-        mq.delay(100, function() return mq.TLO.Cursor() end)
-        mq.cmdf('/notify BigBankWnd BIGB_AutoButton leftmouseup')
-        mq.delay(100, function() return not mq.TLO.Cursor() end)
-    end
-
-    -- Helper function to retrieve a single banked item
-    local function retrieveBankItem(itemName, bankSlot, bankSubSlot)
-        if not bankSubSlot or bankSubSlot == -1 then
-            mq.cmdf('/itemnotify bank%d leftmouseup', bankSlot)
-        else
-            mq.cmdf('/itemnotify in bank%d %d leftmouseup', bankSlot, bankSubSlot)
-        end
-        mq.delay(100, function() return mq.TLO.Cursor() end)
-        mq.cmd('/autoinventory')
-        mq.delay(100, function() return not mq.TLO.Cursor() end)
-    end
-
-    -- Function to check for sufficient empty slots
-    local function hasSufficientEmptySlots(minimumSlots)
-        local emptySlots = mq.TLO.Me.FreeInventory() or 0
-        return emptySlots >= minimumSlots
+        return false -- No suitable slot found
     end
 
     -- Move items from the inventory to the bank
@@ -669,15 +650,21 @@ local function bankstuff()
                             local itemSlot = item.ItemSlot()
                             local itemSlot2 = item.ItemSlot2()
                             if itemSlot and itemSlot2 then
-                                print(string.format("Banking item: %s from bag %d, slot %d", itemName, i, slot))
-                                mq.cmdf(
-                                    "/shift /itemnotify in pack%d %d leftmouseup",
-                                    math.floor(itemSlot - 22), -- Adjust for pack number
-                                    itemSlot2 + 1             -- Sub-slot (1-based index)
-                                )
-                                mq.delay(100, function() return mq.TLO.Cursor() end)
-                                mq.cmdf('/notify BigBankWnd BIGB_AutoButton leftmouseup')
-                                mq.delay(100, function() return not mq.TLO.Cursor() end)
+                                -- Check if the item can fit in the bank
+                                local itemSize = item.Size()
+                                if canItemFitInBank(itemSize) then
+                                    print(string.format("Banking item: %s from bag %d, slot %d", itemName, i, slot))
+                                    mq.cmdf(
+                                        "/shift /itemnotify in pack%d %d leftmouseup",
+                                        math.floor(itemSlot - 22), -- Adjust for pack number
+                                        itemSlot2 + 1             -- Sub-slot (1-based index)
+                                    )
+                                    mq.delay(100, function() return mq.TLO.Cursor() end)
+                                    mq.cmdf('/notify BigBankWnd BIGB_AutoButton leftmouseup')
+                                    mq.delay(100, function() return not mq.TLO.Cursor() end)
+                                else
+                                    mq.cmdf('/dgt ALL No valid bank slot for item: %s', itemName)
+                                end
                             end
                         end
                     end
@@ -690,11 +677,17 @@ local function bankstuff()
                     if action == "Bank" then
                         local itemSlot = slotItem.ItemSlot()
                         if itemSlot then
-                            print(string.format("Banking item: %s from main slot %d", itemName, i))
-                            mq.cmdf("/shift /itemnotify %d leftmouseup", itemSlot)
-                            mq.delay(100, function() return mq.TLO.Cursor() end)
-                            mq.cmdf('/notify BigBankWnd BIGB_AutoButton leftmouseup')
-                            mq.delay(100, function() return not mq.TLO.Cursor() end)
+                            -- Check if the item can fit in the bank
+                            local itemSize = slotItem.Size()
+                            if canItemFitInBank(itemSize) then
+                                print(string.format("Banking item: %s from main slot %d", itemName, i))
+                                mq.cmdf("/shift /itemnotify %d leftmouseup", itemSlot)
+                                mq.delay(100, function() return mq.TLO.Cursor() end)
+                                mq.cmdf('/notify BigBankWnd BIGB_AutoButton leftmouseup')
+                                mq.delay(100, function() return not mq.TLO.Cursor() end)
+                            else
+                                mq.cmdf('/dgt ALL No valid bank slot for item: %s', itemName)
+                            end
                         end
                     end
                 end
@@ -702,28 +695,48 @@ local function bankstuff()
         end
     end
 
--- Move items from the bank to inventory
-    for bankSlot = 1, 24 do -- Bank slots range from 1 to 24
-        if not hasSufficientEmptySlots(4) then
-            mq.cmd("/dgt \\arNot enough empty slots in inventory to continue retrieving items from the bank.")
-            break
+    -- Function to check if the inventory has enough space for an item of a specific size
+    local function canItemFitInInventory(itemSize)
+        -- Loop from the item's size to the maximum size (4)
+        for size = itemSize, 4 do
+            if mq.TLO.Me.FreeInventory(size)() > 0 then
+                return true -- Found a suitable slot
+            end
         end
+        return false -- No suitable slot found
+    end
 
+    -- Helper function to retrieve a single banked item
+    local function retrieveBankItem(itemName, bankSlot, bankSubSlot)
+        if not bankSubSlot or bankSubSlot == -1 then
+            mq.cmdf('/itemnotify bank%d leftmouseup', bankSlot)
+        else
+            mq.cmdf('/itemnotify in bank%d %d leftmouseup', bankSlot, bankSubSlot)
+        end
+        mq.delay(100, function() return mq.TLO.Cursor() end)
+        mq.cmd('/autoinventory')
+        mq.delay(100, function() return not mq.TLO.Cursor() end)
+    end
+
+    -- Move items from the bank to inventory
+    for bankSlot = 1, 24 do -- Bank slots range from 1 to 24
         local containerSize = mq.TLO.Me.Bank(bankSlot).Container()
         if containerSize and containerSize > 0 then
             -- Bank slot contains a container
             for slot = 1, containerSize do
-                if not hasSufficientEmptySlots(4) then
-                    mq.cmd("/dgt \\arNot enough empty slots in inventory to continue retrieving items from the bank.")
-                    break
-                end
                 local item = mq.TLO.Me.Bank(bankSlot).Item(slot)
                 if item.ID() then
                     local itemName = item.Name()
                     local action = getLootAction(itemName) -- Get the action for the item
                     if action == "Keep" or action == "Sell" or action == "Destroy" then
-                        print(string.format("Retrieving item: %s from bank slot %d, sub-slot %d", itemName, bankSlot, slot))
-                        retrieveBankItem(itemName, bankSlot, slot)
+                        local itemSize = item.Size()
+                        if canItemFitInInventory(itemSize) then
+                            print(string.format("Retrieving item: %s from bank slot %d, sub-slot %d", itemName, bankSlot, slot))
+                            retrieveBankItem(itemName, bankSlot, slot)
+                        else
+                            mq.cmd("/dgt \\arNot enough space in inventory for item: " .. itemName)
+                            break
+                        end
                     end
                 end
             end
@@ -731,15 +744,17 @@ local function bankstuff()
             -- Bank slot is not a container
             local item = mq.TLO.Me.Bank(bankSlot).Item()
             if item.ID() then
-                if not hasSufficientEmptySlots(4) then
-                    mq.cmd("/dgt \\arNot enough empty slots in inventory to continue retrieving items from the bank.")
-                    break
-                end
                 local itemName = item.Name()
                 local action = getLootAction(itemName)
                 if action == "Keep" or action == "Sell" or action == "Destroy" then
-                    print(string.format("Retrieving item: %s from bank slot %d", itemName, bankSlot))
-                    retrieveBankItem(itemName, bankSlot, -1)
+                    local itemSize = item.Size()
+                    if canItemFitInInventory(itemSize) then
+                        print(string.format("Retrieving item: %s from bank slot %d", itemName, bankSlot))
+                        retrieveBankItem(itemName, bankSlot, -1)
+                    else
+                        mq.cmd("/dgt \\arNot enough space in inventory for item: " .. itemName)
+                        break
+                    end
                 end
             end
         end
