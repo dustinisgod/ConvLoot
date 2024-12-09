@@ -38,7 +38,6 @@ local iniPath = mq.configDir .. '/loot.ini'
 local customIniPath = nil
 
 
-
 -- Function to load loot configuration
 local function loadLootConfig()
     if isReloading then return end -- Prevent recursive spam during reload
@@ -411,7 +410,7 @@ local function setItemBank(value)
         print("Please specify an item to mark as 'Bank', or place the item on your cursor.")
         return
     end
-    print(string.format("Setting \\ag'%s'\\ax to '\\arIgnore\\ax'.", value))
+    print(string.format("Setting \\ag'%s'\\ax to '\\arBank\\ax'.", value))
     updateLootConfig("Bank", value)
     mq.cmd('/autoinventory')
     mq.cmd('/dgexecute looter /reloadlootfile')
