@@ -353,7 +353,7 @@ local function lootCorpse(corpseID)
                 mq.cmdf('/itemnotify loot%d rightmouseup', i) -- Loot the item
                 mq.delay(200) -- Configurable delay
             else
-                mq.cmdf("/echo \arSkipping item: \ao%s\ax (\arUnknown Action: \ay%s\ax)", itemName, tostring(action))
+                mq.cmdf("/echo \arSkipping item: \ao%s\ax (\arAction: \ay%s\ax)", itemName, tostring(action))
             end
         end
         mq.delay(100)
