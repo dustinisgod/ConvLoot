@@ -35,7 +35,7 @@ local iniPath = mq.configDir .. '/loot.ini'
 -- Inside of the init.lua file find line customIniPath = nil and change it to your path local customIniPath = '//pcname/c/Macroquest/config/Loot.ini'.
 -- This will allow you to use the same loot.ini file across a local area network. All chars will read and update this file.
 
-local customIniPath = nil
+local customIniPath = '//Dustin-pc/c/MQ-Emu/config/loot.ini'
 
 
 -- Function to load loot configuration
@@ -149,190 +149,6 @@ local function updateLootConfig(action, itemName)
     saveLootConfig()
 end
 
-
--- Mark a corpse as ignored for a duration
-local function markCorpseIgnored(corpseID)
-    ignoredCorpses[corpseID] = os.time() + settings.IgnoreCorpseDuration
-end
-
--- Mark a corpse as locked for a duration
-local function markLockedCorpse(corpseID)
-    lockedCorpses[corpseID] = os.time() + settings.LockedCorpseDuration
-end
-
--- Function to check inventory space
-local function hasSufficientInventorySpace()
-    local emptySlots = mq.TLO.Me.FreeInventory() or 0
-    if emptySlots <= settings.MinimumEmptySlots - 1 then
-        if not inventoryFullReported then
-            mq.cmdf("/dgt \\ar!!!!\\ax \\ayInventory is almost full (\\ax\\ag%d\\ax\\ay empty slots remaining). Looting paused.\\ax\\ar !!!!\\ax", emptySlots)
-            inventoryFullReported = true -- Set the flag to avoid duplicate messages
-        end
-        return false
-    else
-        if inventoryFullReported then
-            mq.cmd("/echo \agInventory space available. Resuming looting.\ax")
-            inventoryFullReported = false -- Reset the flag when space is available
-        end
-        return true
-    end
-end
-
--- Check if a corpse is locked due to ignored items
-local function isIgnoredCorpse(corpseID)
-    local ignoreUntil = ignoredCorpses[corpseID]
-    if not ignoreUntil then return false end
-    if os.time() > ignoreUntil then
-        ignoredCorpses[corpseID] = nil
-        return false
-    end
-    return true
-end
-
-local function isLockedCorpse(corpseID)
-    local lockUntil = lockedCorpses[corpseID]
-    if not lockUntil then return false end
-    if os.time() > lockUntil then
-        lockedCorpses[corpseID] = nil
-        return false
-    end
-    return true
-end
-
-local function getLootAction(itemName)
-    for section, items in pairs(lootConfig) do
-        if items[itemName] then
-            return items[itemName]
-        end
-    end
-    mq.cmdf("/echo \arItem \ao'%s'\ax not found in loot configuration.", itemName)
-    return nil
-end
-
-
-local function lootCorpse(corpseID)
-
-    if corpseID then
-        print("Attempting to loot corpse ID: " .. corpseID)
-        mq.cmdf('/target id %d', corpseID)
-        mq.delay(500, function() return mq.TLO.Target() and corpseID and mq.TLO.Target.ID() == corpseID end)
-    end
-    -- Ensure the target is a corpse
-    if mq.TLO.Target.Type() ~= "Corpse" then
-        print("Target is not a corpse.")
-        return
-    end
-
-    -- Open the loot window
-    local success = false
-    for attempt = 1, 3 do
-        mq.cmd('/loot')
-        mq.delay(1000, function() return mq.TLO.Window('LootWnd').Open() end)
-        if mq.TLO.Window('LootWnd').Open() then
-            success = true
-            break
-        end
-    end
-
-    if not success then
-        mq.cmdf("/echo \arFailed to open loot window for corpse ID: \ao%s\ax", corpseID)
-        markLockedCorpse(corpseID) -- Mark the corpse as locked after 3 failed attempts
-        return
-    end
-
-    local items = mq.TLO.Corpse.Items() or 0
-    mq.cmdf("/echo \agLoot window opened. Items available: \ay%s\ax", items)
-    debugPrint("Items: " .. items)
-    local corpseHasLoreItem = false -- Flag to mark the corpse as not lootable
-
-    -- Iterate through all loot slots and handle items
-    for i = 1, items do
-        debugPrint("Checking loot slot: " .. i)
-        local item = mq.TLO.Corpse.Item(i)
-        if item() then
-            local itemName = item.Name()
-            local isNoTrade = item.NoDrop() -- Check if the item is No-Trade
-            local isLore = item.Lore() -- Check if the item is Lore
-            local action = getLootAction(itemName)
-
-            if isNoTrade and not settings.LootNoDrop then
-                mq.cmdf('/dgt \\ar!!!!\\ax \\aySkipping No-Drop item:\\ax \\ag%s\\ax \\ayon Corpse ID:\\ax \\ag%d\\ax \\ar!!!!', itemName, corpseID)
-                goto continue
-            end
-
-            if isLore then
-                mq.cmdf("/echo \agItem \ao'%s'\ax is \ayLore\ax. Checking inventory.", itemName)
-                local alreadyHaveItem = mq.TLO.FindItem(itemName)() or mq.TLO.FindItemBank(itemName)()
-                if alreadyHaveItem then
-                    mq.cmdf('/dgt \\ar!!!!\\ax \\aySkipping Lore item:\\ax \\ag%s\\ax \\ayon Corpse ID:\\ax \\ag%d\\ax \\ar!!!!', itemName, corpseID)
-                    corpseHasLoreItem = true
-                    goto continue
-                end
-            end
-
-            if action == "Keep" or action == "Bank" or action == "Sell" then
-                mq.cmdf("/echo \agLooting item: \ao%s\ax (\ayAction: %s\ax)", itemName, action)
-                mq.cmdf('/itemnotify loot%d rightmouseup', i) -- Loot the item
-                mq.delay(200) -- Configurable delay to ensure proper processing
-            else
-                mq.cmdf("/echo \arSkipping item: \ao%s\ax (\arUnknown Action: \ay%s\ax)", itemName, tostring(action))
-            end
-
-            ::continue::
-        end
-        mq.delay(100)
-    end
-
-    -- Mark corpse as not lootable if it has skipped Lore items
-    if corpseHasLoreItem then
-        markCorpseIgnored(corpseID) -- Mark the corpse as ignored
-    end
-
-    -- Close the loot window after processing all items
-    print("Closing loot window for corpse ID: " .. corpseID)
-    markCorpseIgnored(corpseID) -- Mark the corpse as ignored
-    mq.cmd('/nomodkey /notify LootWnd LW_DoneButton leftmouseup')
-    mq.delay(1000, function() return not mq.TLO.Window('LootWnd').Open() end)
-end
-
--- Loot nearby corpses function with slot check
-local function lootNearbyCorpses(limit)
-    if not hasSufficientInventorySpace() then return false end -- Stop if inventory is full
-
-    local deadCount = mq.TLO.SpawnCount(('npccorpse radius %d'):format(settings.CorpseRadius))()
-    local mobsNearby = mq.TLO.SpawnCount(('xtarhater radius %d'):format(settings.MobsTooClose))()
-
-    if deadCount == 0 or (mobsNearby > 0 and not settings.CombatLooting) then return false end
-
-    local didLoot = false
-    for i = 1, (limit or deadCount) do
-        local corpse = mq.TLO.NearestSpawn(('%d, npccorpse radius %d'):format(i, settings.CorpseRadius))
-        if corpse() then
-            local corpseID = corpse.ID()
-            local distance = corpse.Distance3D() -- Get the 3D distance to the corpse
-
-            if not isIgnoredCorpse(corpseID) and not cantLootList[corpseID] and not isLockedCorpse(corpseID) then
-                if corpse() and distance and distance <= 15 then
-                    printf("Looting nearby corpse ID %d at distance %.2f.", corpseID, distance)
-                    lootCorpse(corpseID)
-                else
-                    printf("Navigating to corpse ID %d at distance %.2f.", corpseID, distance)
-                    mq.cmdf('/nav spawn id %d', corpseID)
-                    mq.delay(2000, function() return corpse() and corpse.Distance3D() and corpse.Distance3D() <= 15 end) -- Wait until within 15 units
-                    if corpse() and corpse.Distance3D() and corpse.Distance3D() <= 15 then
-                        printf("Now within 15 units. Looting corpse ID %d.", corpseID)
-                        lootCorpse(corpseID)
-                    else
-                        printf("Failed to reach corpse ID %d within 15 units.", corpseID)
-                    end
-                end
-                didLoot = true
-            end
-        end
-    end
-    return didLoot
-end
-
 mq.bind('/reloadlootfile', function()
     print("Reloading loot configuration...")
     loadLootConfig()
@@ -429,6 +245,161 @@ local function setItemDestroy(value)
     mq.cmdf('/echo \agItem \ao%s\ax is now set to \arDestroy\ax.', value)
     mq.cmd('/destroy')
     mq.cmd('/dgexecute looter /reloadlootfile')
+end
+
+-- Mark a corpse as locked for a duration
+local function markLockedCorpse(corpseID)
+    lockedCorpses[corpseID] = os.time() + settings.LockedCorpseDuration
+end
+
+-- Function to check inventory space
+local function hasSufficientInventorySpace()
+    local emptySlots = mq.TLO.Me.FreeInventory() or 0
+    if emptySlots <= settings.MinimumEmptySlots - 1 then
+        if not inventoryFullReported then
+            mq.cmdf("/dgt \\ar!!!!\\ax \\ayInventory is almost full (\\ax\\ag%d\\ax\\ay empty slots remaining). Looting paused.\\ax\\ar !!!!\\ax", emptySlots)
+            inventoryFullReported = true -- Set the flag to avoid duplicate messages
+        end
+        return false
+    else
+        if inventoryFullReported then
+            mq.cmd("/echo \agInventory space available. Resuming looting.\ax")
+            inventoryFullReported = false -- Reset the flag when space is available
+        end
+        return true
+    end
+end
+
+-- Check if a corpse is locked due to ignored items
+local function isIgnoredCorpse(corpseID)
+    local ignoreUntil = ignoredCorpses[corpseID]
+    if not ignoreUntil then return false end
+    if os.time() > ignoreUntil then
+        ignoredCorpses[corpseID] = nil
+        return false
+    end
+    return true
+end
+
+local function isLockedCorpse(corpseID)
+    local lockUntil = lockedCorpses[corpseID]
+    if not lockUntil then return false end
+    if os.time() > lockUntil then
+        lockedCorpses[corpseID] = nil
+        return false
+    end
+    return true
+end
+
+local function getLootAction(itemName)
+    for section, items in pairs(lootConfig) do
+        if items[itemName] then
+            return items[itemName]
+        end
+    end
+    mq.cmdf("/echo \arItem \ao'%s'\ax not found in loot configuration.", itemName)
+    return nil
+end
+
+local function lootCorpse(corpseID)
+    if corpseID then
+        print("Attempting to loot corpse ID: " .. corpseID)
+        mq.cmdf('/target id %d', corpseID)
+        mq.delay(500, function() return mq.TLO.Target() and corpseID and mq.TLO.Target.ID() == corpseID end)
+    end
+    -- Ensure the target is a corpse
+    if mq.TLO.Target.Type() ~= "Corpse" then
+        print("Target is not a corpse.")
+        return
+    end
+
+    -- Open the loot window
+    local success = false
+    for attempt = 1, 3 do
+        mq.cmd('/loot')
+        mq.delay(1000, function() return mq.TLO.Window('LootWnd').Open() end)
+        if mq.TLO.Window('LootWnd').Open() then
+            success = true
+            break
+        end
+    end
+
+    if not success then
+        mq.cmdf("/echo \arFailed to open loot window for corpse ID: \ao%s\ax", corpseID)
+        markLockedCorpse(corpseID)
+        return
+    end
+
+    local items = mq.TLO.Corpse.Items() or 0
+    mq.cmdf("/echo \agLoot window opened. Items available: \ay%s\ax", items)
+    debugPrint("Items: " .. items)
+
+    for i = 1, items do
+        debugPrint("Checking loot slot: " .. i)
+        local item = mq.TLO.Corpse.Item(i)
+        if item() then
+            local itemName = item.Name()
+            local action = getLootAction(itemName) -- Check action from loot.ini
+
+            if not action then
+                -- If the item is not in loot.ini, add it with Keep action
+                mq.cmdf("/echo \ayAdding item to loot.ini as Keep: \ao%s\ax", itemName)
+                setItemKeep(itemName)
+                action = "Keep" -- Assume Keep after adding
+            end
+
+            if action == "Keep" or action == "Bank" or action == "Sell" then
+                mq.cmdf("/echo \agLooting item: \ao%s\ax (\ayAction: %s\ax)", itemName, action)
+                mq.cmdf('/itemnotify loot%d rightmouseup', i) -- Loot the item
+                mq.delay(200) -- Configurable delay
+            else
+                mq.cmdf("/echo \arSkipping item: \ao%s\ax (\arUnknown Action: \ay%s\ax)", itemName, tostring(action))
+            end
+        end
+        mq.delay(100)
+    end
+
+    print("Closing loot window for corpse ID: " .. corpseID)
+    mq.cmd('/nomodkey /notify LootWnd LW_DoneButton leftmouseup')
+    mq.delay(1000, function() return not mq.TLO.Window('LootWnd').Open() end)
+end
+
+-- Loot nearby corpses function with slot check
+local function lootNearbyCorpses(limit)
+    if not hasSufficientInventorySpace() then return false end -- Stop if inventory is full
+
+    local deadCount = mq.TLO.SpawnCount(('npccorpse radius %d'):format(settings.CorpseRadius))()
+    local mobsNearby = mq.TLO.SpawnCount(('xtarhater radius %d'):format(settings.MobsTooClose))()
+
+    if deadCount == 0 or (mobsNearby > 0 and not settings.CombatLooting) then return false end
+
+    local didLoot = false
+    for i = 1, (limit or deadCount) do
+        local corpse = mq.TLO.NearestSpawn(('%d, npccorpse radius %d'):format(i, settings.CorpseRadius))
+        if corpse() then
+            local corpseID = corpse.ID()
+            local distance = corpse.Distance3D() -- Get the 3D distance to the corpse
+
+            if not isIgnoredCorpse(corpseID) and not cantLootList[corpseID] and not isLockedCorpse(corpseID) then
+                if corpse() and distance and distance <= 15 then
+                    printf("Looting nearby corpse ID %d at distance %.2f.", corpseID, distance)
+                    lootCorpse(corpseID)
+                else
+                    printf("Navigating to corpse ID %d at distance %.2f.", corpseID, distance)
+                    mq.cmdf('/nav spawn id %d', corpseID)
+                    mq.delay(2000, function() return corpse() and corpse.Distance3D() and corpse.Distance3D() <= 15 end) -- Wait until within 15 units
+                    if corpse() and corpse.Distance3D() and corpse.Distance3D() <= 15 then
+                        printf("Now within 15 units. Looting corpse ID %d.", corpseID)
+                        lootCorpse(corpseID)
+                    else
+                        printf("Failed to reach corpse ID %d within 15 units.", corpseID)
+                    end
+                end
+                didLoot = true
+            end
+        end
+    end
+    return didLoot
 end
 
 local function findnearbymerchant()
